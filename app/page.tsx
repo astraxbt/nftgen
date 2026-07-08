@@ -32,6 +32,9 @@ export default function Page() {
   const [mode, setMode] = useState<"random" | "all">("random");
   const [namePrefix, setNamePrefix] = useState("NFT");
   const [seed, setSeed] = useState("");
+  // Frame layout: explicit frame count / columns per spritesheet (0 = auto-detect).
+  const [frames, setFrames] = useState(12);
+  const [columns, setColumns] = useState(0);
   // Per-optional-category chance (0-100%) that the layer is left empty.
   const [emptyPct, setEmptyPct] = useState<Partial<Record<CategoryKey, number>>>({});
 
@@ -89,6 +92,8 @@ export default function Page() {
           frameMs,
           mode,
           frameSize: null,
+          frames: frames > 0 ? frames : null,
+          columns: columns > 0 ? columns : null,
           namePrefix,
           seed: seed.trim() === "" ? null : Number(seed),
         },
@@ -215,6 +220,34 @@ export default function Page() {
               className="w-full rounded-lg border border-edge bg-ink px-3 py-2 text-sm"
             />
           </Field>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Frames / sheet">
+              <input
+                type="number"
+                min={0}
+                value={frames}
+                onChange={(e) => setFrames(Math.max(0, Number(e.target.value)))}
+                placeholder="auto"
+                className="w-full rounded-lg border border-edge bg-ink px-3 py-2 text-sm"
+              />
+            </Field>
+            <Field label="Columns">
+              <input
+                type="number"
+                min={0}
+                value={columns}
+                onChange={(e) => setColumns(Math.max(0, Number(e.target.value)))}
+                placeholder="1 row"
+                className="w-full rounded-lg border border-edge bg-ink px-3 py-2 text-sm"
+              />
+            </Field>
+          </div>
+          <p className="-mt-2 text-[11px] text-slate-500">
+            Set <span className="text-slate-300">Frames / sheet</span> to how many frames your
+            spritesheet has (e.g. from the .gif). Leave 0 to auto-detect square frames. Columns is
+            only needed for grid sheets (blank = single horizontal strip).
+          </p>
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="Name prefix">
