@@ -1,5 +1,6 @@
 import { list } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
+import { resolveBlobToken } from "@/lib/blob";
 import { MANIFEST_PATH, ProjectManifest } from "@/lib/manifest";
 
 // Resolves a project id to its manifest. The manifest is stored at a stable
@@ -14,7 +15,8 @@ export async function GET(
     return NextResponse.json({ error: "bad id" }, { status: 400 });
   }
   try {
-    const { blobs } = await list({ prefix: MANIFEST_PATH(id), limit: 1 });
+    const token = resolveBlobToken();
+    const { blobs } = await list({ prefix: MANIFEST_PATH(id), limit: 1, token });
     if (blobs.length === 0) {
       return NextResponse.json({ error: "not found" }, { status: 404 });
     }
