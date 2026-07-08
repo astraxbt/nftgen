@@ -1,4 +1,3 @@
-import { upload } from "@vercel/blob/client";
 import { ManifestSettings, ManifestTrait, ProjectManifest } from "./manifest";
 import { CategoryKey, TraitOption } from "./types";
 
@@ -8,13 +7,20 @@ function safe(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
 
+// Upload a single sheet through our own route (server-side put), avoiding the
+// CORS restrictions of direct browser->Blob uploads.
 async function putFile(file: File, path: string): Promise<string> {
-  const res = await upload(path, file, {
-    access: "public",
-    handleUploadUrl: "/api/blob-upload",
-    contentType: "image/png",
+  const res = await fetch(`/api/upload?name=${encodeURIComponent(path)}`, {
+    method: "POST",
+    headers: { "content-type": "image/png" },
+    body: file,
   });
-  return res.url;
+  if (!res.ok) {
+    const msg = await res.json().catch(() => ({}));
+    throw new Error(msg.error || `upload failed (${res.status})`);
+  }
+  const { url } = (await res.json()) as { url: string };
+  return url;
 }
 
 export interface SaveArgs {
