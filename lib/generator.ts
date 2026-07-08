@@ -4,6 +4,9 @@ import {
   CategoryKey,
   GeneratedNft,
   GenerateOptions,
+  sourceKey,
+  sourceOf,
+  SpriteSource,
   TraitOption,
 } from "./types";
 
@@ -16,16 +19,19 @@ interface LayerSprite {
   frameCount: number;
 }
 
-export function loadImage(file: File): Promise<HTMLImageElement> {
+export function loadImage(src: SpriteSource): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
+    const isFile = typeof src !== "string";
+    const url = isFile ? URL.createObjectURL(src) : src;
     const img = new Image();
+    // Remote sheets must be CORS-enabled so the canvas stays untainted for getImageData.
+    if (!isFile) img.crossOrigin = "anonymous";
     img.onload = () => {
-      URL.revokeObjectURL(url);
+      if (isFile) URL.revokeObjectURL(url);
       resolve(img);
     };
     img.onerror = (e) => {
-      URL.revokeObjectURL(url);
+      if (isFile) URL.revokeObjectURL(url);
       reject(e);
     };
     img.src = url;
@@ -65,8 +71,8 @@ function detectGrid(w: number, h: number, layout: FrameLayout) {
   return { fw: w, fh: h, cols: 1, rows: 1 };
 }
 
-async function toSprite(file: File, layout: FrameLayout): Promise<LayerSprite> {
-  const img = await loadImage(file);
+async function toSprite(src: SpriteSource, layout: FrameLayout): Promise<LayerSprite> {
+  const img = await loadImage(src);
   const { fw, fh, cols, rows } = detectGrid(img.width, img.height, layout);
   // When an explicit frame count is given, don't count padding cells in a grid.
   const grid = cols * rows;
@@ -206,7 +212,7 @@ function buildSelections(
 // Public entry point
 // ---------------------------------------------------------------------------
 export interface GenerateInputs {
-  base: File;
+  base: SpriteSource;
   options: Record<CategoryKey, TraitOption[]>;
   noneWeights: Partial<Record<CategoryKey, number>>;
   opts: GenerateOptions;
@@ -220,17 +226,18 @@ export async function generate({
   opts,
   onProgress,
 }: GenerateInputs): Promise<GeneratedNft[]> {
-  // Cache sprites so each spritesheet is sliced only once.
-  const cache = new Map<File, LayerSprite>();
-  const spriteFor = async (file: File) => {
-    let s = cache.get(file);
+  // Cache sprites so each spritesheet is sliced only once (keyed by source).
+  const cache = new Map<string, LayerSprite>();
+  const spriteFor = async (src: SpriteSource) => {
+    const key = sourceKey(src);
+    let s = cache.get(key);
     if (!s) {
-      s = await toSprite(file, {
+      s = await toSprite(src, {
         frameSize: opts.frameSize ?? null,
         frames: opts.frames ?? null,
         columns: opts.columns ?? null,
       });
-      cache.set(file, s);
+      cache.set(key, s);
     }
     return s;
   };
@@ -250,7 +257,7 @@ export async function generate({
       }
       const opt = sel[c.key];
       if (!opt) continue;
-      layers.push(await spriteFor(opt.file));
+      layers.push(await spriteFor(sourceOf(opt)));
       traits.push({ category: c.key, name: opt.name });
     }
     const blob = encodeApng(layers, opts.frameMs);

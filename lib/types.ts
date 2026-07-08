@@ -12,8 +12,23 @@ export const CATEGORIES: { key: CategoryKey; folder: string; optional: boolean }
 export interface TraitOption {
   category: CategoryKey;
   name: string;
-  file: File;
+  /** Local file (owner uploading) OR remote url (shared project). One is set. */
+  file?: File;
+  url?: string;
   weight: number;
+}
+
+/** A spritesheet source: a local File or a remote URL. */
+export type SpriteSource = File | string;
+
+export function sourceOf(opt: TraitOption): SpriteSource {
+  const src = opt.file ?? opt.url;
+  if (!src) throw new Error(`trait ${opt.category}/${opt.name} has no file or url`);
+  return src;
+}
+
+export function sourceKey(src: SpriteSource): string {
+  return typeof src === "string" ? src : `${src.name}:${src.size}:${src.lastModified}`;
 }
 
 export interface GeneratedNft {
