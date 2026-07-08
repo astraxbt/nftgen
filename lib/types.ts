@@ -28,6 +28,8 @@ export interface GenerateOptions {
   frameMs: number;
   mode: "random" | "all";
   frameSize?: number | null; // force square frame size, else auto-detect
+  frames?: number | null; // explicit frame count per spritesheet (0/null = auto)
+  columns?: number | null; // frames per row (null = single row)
   namePrefix: string;
   seed?: number | null;
 }

@@ -32,15 +32,32 @@ export function loadImage(file: File): Promise<HTMLImageElement> {
   });
 }
 
-/** Infer the frame grid of a spritesheet. Assumes square frames unless forced. */
-function detectGrid(w: number, h: number, frameSize?: number | null) {
+export interface FrameLayout {
+  frameSize?: number | null; // force square frame size
+  frames?: number | null; // explicit total frame count
+  columns?: number | null; // frames per row (defaults to a single row)
+}
+
+/** Infer the frame grid of a spritesheet. */
+function detectGrid(w: number, h: number, layout: FrameLayout) {
+  const { frameSize, frames, columns } = layout;
+
+  // 1) Explicit frame count (most reliable for non-square strips/grids).
+  if (frames && frames > 0) {
+    const cols = columns && columns > 0 ? columns : frames;
+    const rows = Math.max(1, Math.ceil(frames / cols));
+    return { fw: Math.floor(w / cols), fh: Math.floor(h / rows), cols, rows };
+  }
+
+  // 2) Explicit square frame size.
   if (frameSize && frameSize > 0) {
     if (w % frameSize !== 0 || h % frameSize !== 0) {
       throw new Error(`frame size ${frameSize} does not evenly divide sheet ${w}x${h}`);
     }
     return { fw: frameSize, fh: frameSize, cols: w / frameSize, rows: h / frameSize };
   }
-  // Square frames in a single horizontal strip.
+
+  // 3) Auto: square frames in a single horizontal strip.
   if (w % h === 0 && w >= h) return { fw: h, fh: h, cols: w / h, rows: 1 };
   // Single vertical strip.
   if (h % w === 0 && h > w) return { fw: w, fh: w, cols: 1, rows: h / w };
@@ -48,10 +65,13 @@ function detectGrid(w: number, h: number, frameSize?: number | null) {
   return { fw: w, fh: h, cols: 1, rows: 1 };
 }
 
-async function toSprite(file: File, frameSize?: number | null): Promise<LayerSprite> {
+async function toSprite(file: File, layout: FrameLayout): Promise<LayerSprite> {
   const img = await loadImage(file);
-  const { fw, fh, cols, rows } = detectGrid(img.width, img.height, frameSize);
-  return { img, fw, fh, cols, rows, frameCount: cols * rows };
+  const { fw, fh, cols, rows } = detectGrid(img.width, img.height, layout);
+  // When an explicit frame count is given, don't count padding cells in a grid.
+  const grid = cols * rows;
+  const frameCount = layout.frames && layout.frames > 0 ? Math.min(layout.frames, grid) : grid;
+  return { img, fw, fh, cols, rows, frameCount };
 }
 
 function frameRect(sprite: LayerSprite, index: number) {
@@ -205,7 +225,11 @@ export async function generate({
   const spriteFor = async (file: File) => {
     let s = cache.get(file);
     if (!s) {
-      s = await toSprite(file, opts.frameSize ?? null);
+      s = await toSprite(file, {
+        frameSize: opts.frameSize ?? null,
+        frames: opts.frames ?? null,
+        columns: opts.columns ?? null,
+      });
       cache.set(file, s);
     }
     return s;
